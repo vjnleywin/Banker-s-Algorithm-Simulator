@@ -1,0 +1,279 @@
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
+
+public class BankersAlgorithm {
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        // 1. Read system dimensions
+        System.out.print("Enter number of processes: ");
+        int n = sc.nextInt();
+
+        System.out.print("Enter number of resource types: ");
+        int m = sc.nextInt();
+
+        int[] total = new int[m];
+        int[][] allocation = new int[n][m];
+        int[][] max = new int[n][m];
+        int[][] need = new int[n][m];
+        int[] available = new int[m];
+
+        // 2. Read Total resource vector
+        System.out.println("Enter Total resources vector (" + m + " values):");
+        for (int j = 0; j < m; j++) {
+            total[j] = sc.nextInt();
+        }
+
+        // 3. Read Allocation matrix
+        System.out.println("Enter Allocation matrix (" + n + " x " + m + "):");
+        for (int i = 0; i < n; i++) {
+            System.out.print("  P" + i + ": ");
+            for (int j = 0; j < m; j++) {
+                allocation[i][j] = sc.nextInt();
+            }
+        }
+
+        // 4. Read Max matrix
+        System.out.println("Enter Max matrix (" + n + " x " + m + "):");
+        for (int i = 0; i < n; i++) {
+            System.out.print("  P" + i + ": ");
+            for (int j = 0; j < m; j++) {
+                max[i][j] = sc.nextInt();
+            }
+        }
+
+        // 5. Compute Need = Max - Allocation
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                need[i][j] = max[i][j] - allocation[i][j];
+                if (need[i][j] < 0) {
+                    System.out.println("Error: Allocation exceeds Max for P" + i + " resource R" + j);
+                    sc.close();
+                    return;
+                }
+            }
+        }
+
+        // 6. Compute Available = Total - column sums of Allocation
+        for (int j = 0; j < m; j++) {
+            int colSum = 0;
+            for (int i = 0; i < n; i++) {
+                colSum += allocation[i][j];
+            }
+            available[j] = total[j] - colSum;
+            if (available[j] < 0) {
+                System.out.println("Error: Total allocated exceeds Total resources for R" + j);
+                sc.close();
+                return;
+            }
+        }
+
+        // 7. Display Initial State & Run Safety Algorithm
+        System.out.println("\n================ INITIAL SYSTEM STATE ================");
+        printSystemState(total, available, allocation, max, need);
+
+        System.out.println("\n================ BANKER'S SAFETY ALGORITHM ================");
+        runSafetyAlgorithm(available, allocation, need);
+
+        // 8. Optional Resource-Request Algorithm Extension
+        while (true) {
+            System.out.print("\nDo you want to test a Resource Request? (y/n): ");
+            String choice = sc.next().trim();
+            if (!choice.equalsIgnoreCase("y")) {
+                break;
+            }
+            handleResourceRequest(sc, total, available, allocation, max, need);
+        }
+
+        sc.close();
+    }
+
+    /**
+     * Executes Banker's Safety Algorithm with step-by-step trace output.
+     */
+    public static boolean runSafetyAlgorithm(int[] available, int[][] allocation, int[][] need) {
+        int n = allocation.length;
+        int m = available.length;
+
+        int[] work = Arrays.copyOf(available, m);
+        boolean[] finish = new boolean[n];
+        List<Integer> safeSequence = new ArrayList<>();
+
+        System.out.println("Initial Work   = " + Arrays.toString(work));
+        System.out.println("Initial Finish = " + Arrays.toString(finish));
+        System.out.println("-----------------------------------------------------------");
+
+        int completed = 0;
+        int pass = 1;
+
+        while (completed < n) {
+            boolean progressMade = false;
+            System.out.println("Pass " + pass + ":");
+
+            for (int i = 0; i < n; i++) {
+                if (!finish[i]) {
+                    boolean canExecute = isLessOrEqual(need[i], work);
+                    System.out.printf("  Compare P%d: Need %s <= Work %s -> %s%n",
+                            i, Arrays.toString(need[i]), Arrays.toString(work),
+                            canExecute ? "TRUE" : "FALSE");
+
+                    if (canExecute) {
+                        for (int j = 0; j < m; j++) {
+                            work[j] += allocation[i][j];
+                        }
+                        finish[i] = true;
+                        safeSequence.add(i);
+                        completed++;
+                        progressMade = true;
+
+                        System.out.printf("    -> P%d executes! Updated Work = %s | Finish = %s%n",
+                                i, Arrays.toString(work), Arrays.toString(finish));
+                    }
+                }
+            }
+
+            if (!progressMade) {
+                break; // No unfinished process can proceed; system is unsafe
+            }
+            pass++;
+        }
+
+        System.out.println("-----------------------------------------------------------");
+        System.out.println("Final Finish Flags: " + Arrays.toString(finish));
+
+        if (completed == n) {
+            System.out.print("Result: SAFE STATE | Safe Sequence: <");
+            for (int i = 0; i < safeSequence.size(); i++) {
+                System.out.print("P" + safeSequence.get(i));
+                if (i < safeSequence.size() - 1) {
+                    System.out.print(", ");
+                }
+            }
+            System.out.println(">");
+            return true;
+        } else {
+            System.out.println("Result: UNSAFE STATE (No safe sequence exists)");
+            return false;
+        }
+    }
+
+    /**
+     * Handles Resource-Request validation, tentative allocation, and safety verification.
+     */
+    public static void handleResourceRequest(
+            Scanner sc, int[] total, int[] available,
+            int[][] allocation, int[][] max, int[][] need) {
+
+        int n = allocation.length;
+        int m = available.length;
+
+        System.out.print("Enter requesting process ID (0 to " + (n - 1) + "): ");
+        int p = sc.nextInt();
+        if (p < 0 || p >= n) {
+            System.out.println("Invalid process ID.");
+            return;
+        }
+
+        int[] request = new int[m];
+        System.out.println("Enter Request vector for P" + p + " (" + m + " values):");
+        for (int j = 0; j < m; j++) {
+            request[j] = sc.nextInt();
+        }
+
+        System.out.println("\n================ RESOURCE-REQUEST CHECK (P" + p + ") ================");
+        System.out.println("Request = " + Arrays.toString(request));
+
+        // Step 1: Check Request <= Need[p]
+        boolean withinNeed = isLessOrEqual(request, need[p]);
+        System.out.printf("Step 1: Request %s <= Need[P%d] %s -> %s%n",
+                Arrays.toString(request), p, Arrays.toString(need[p]),
+                withinNeed ? "TRUE" : "FALSE");
+
+        if (!withinNeed) {
+            System.out.println("DECISION: REJECTED (Error: Process exceeded its maximum claim).");
+            return;
+        }
+
+        // Step 2: Check Request <= Available
+        boolean withinAvailable = isLessOrEqual(request, available);
+        System.out.printf("Step 2: Request %s <= Available %s -> %s%n",
+                Arrays.toString(request), Arrays.toString(available),
+                withinAvailable ? "TRUE" : "FALSE");
+
+        if (!withinAvailable) {
+            System.out.println("DECISION: WAIT (Resources are not currently available; P" + p + " must wait).");
+            return;
+        }
+
+        // Step 3: Create Tentative State
+        int[] tentAvailable = Arrays.copyOf(available, m);
+        int[][] tentAllocation = copyMatrix(allocation);
+        int[][] tentNeed = copyMatrix(need);
+
+        for (int j = 0; j < m; j++) {
+            tentAvailable[j] -= request[j];
+            tentAllocation[p][j] += request[j];
+            tentNeed[p][j] -= request[j];
+        }
+
+        System.out.println("\n--- Tentative State (if Request is granted) ---");
+        printSystemState(total, tentAvailable, tentAllocation, max, tentNeed);
+
+        // Step 4: Run Safety Algorithm on Tentative State
+        System.out.println("\n--- Safety Check on Tentative State ---");
+        boolean isSafe = runSafetyAlgorithm(tentAvailable, tentAllocation, tentNeed);
+
+        if (isSafe) {
+            // Commit tentative changes to actual state
+            System.arraycopy(tentAvailable, 0, available, 0, m);
+            for (int i = 0; i < n; i++) {
+                System.arraycopy(tentAllocation[i], 0, allocation[i], 0, m);
+                System.arraycopy(tentNeed[i], 0, need[i], 0, m);
+            }
+            System.out.println("\nDECISION: GRANT (Request granted; system remains in a SAFE STATE).");
+        } else {
+            System.out.println("\nDECISION: WAIT (Granting leads to an UNSAFE STATE; P" + p + " must wait and state is restored).");
+        }
+    }
+
+    /**
+     * Component-wise vector comparison: returns true iff a[j] <= b[j] for all j.
+     */
+    private static boolean isLessOrEqual(int[] a, int[] b) {
+        for (int j = 0; j < a.length; j++) {
+            if (a[j] > b[j]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int[][] copyMatrix(int[][] src) {
+        int[][] copy = new int[src.length][];
+        for (int i = 0; i < src.length; i++) {
+            copy[i] = Arrays.copyOf(src[i], src[i].length);
+        }
+        return copy;
+    }
+
+    private static void printSystemState(
+            int[] total, int[] available,
+            int[][] allocation, int[][] max, int[][] need) {
+
+        System.out.println("Total     : " + Arrays.toString(total));
+        System.out.println("Available : " + Arrays.toString(available));
+        System.out.println();
+        System.out.printf("%-10s %-18s %-18s %-18s%n", "Process", "Allocation", "Max", "Need");
+        System.out.println("----------------------------------------------------------------");
+        for (int i = 0; i < allocation.length; i++) {
+            System.out.printf("P%-9d %-18s %-18s %-18s%n",
+                    i,
+                    Arrays.toString(allocation[i]),
+                    Arrays.toString(max[i]),
+                    Arrays.toString(need[i]));
+        }
+    }
+}
