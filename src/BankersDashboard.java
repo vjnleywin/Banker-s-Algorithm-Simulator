@@ -87,7 +87,7 @@ public class BankersDashboard extends JFrame {
     private final JLabel status = new JLabel();
 
     public BankersDashboard() {
-        super("Banker's Algorithm | PT101 Topic 5");
+        super("OhSome");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1260, 840);
         setMinimumSize(new Dimension(1020, 700));
@@ -138,10 +138,10 @@ public class BankersDashboard extends JFrame {
         JPanel text = new JPanel();
         text.setOpaque(false);
         text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-        JLabel title = new JLabel("Banker's Algorithm");
+        JLabel title = new JLabel("OhSome: An Interactive Simulation of the Banker's Algorithm");
         title.setFont(BASE.deriveFont(Font.BOLD, 24f));
         title.setForeground(Color.WHITE);
-        JLabel sub = new JLabel("Deadlock avoidance simulator  •  PT 101  •  Topic 5");
+        JLabel sub = new JLabel("Deadlock avoidance simulator");
         sub.setFont(BASE);
         sub.setForeground(new Color(0xDDD6FE));
         text.add(title);
